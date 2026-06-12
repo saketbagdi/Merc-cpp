@@ -1,0 +1,13 @@
+*.exe
+*.o
+*.obj
+*.out
+*.dll
+*.so
+
+.vscode/
+
+build/
+
+
+*.log
