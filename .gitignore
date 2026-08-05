@@ -8,6 +8,6 @@
 .vscode/
 
 build/
-
-
+backup_folder/
 *.log
+cmp.bat

@@ -1,5 +1,33 @@
 #include<iostream>
+#include<map>
+#include<forward_list>
 using namespace std;
+
+/* ============================= Validator class ========================== */
+class Validator
+{
+private:
+Validator(){}
+public:
+static bool isValidMIMEType(string &mimeType)
+{
+//right now do nothing
+return true;
+}
+static bool isValidPath(string &path)
+{
+//right now do nothing
+return true;
+}
+static bool isValidURLFormat(string &url)
+{
+//right now do nothing 
+return true;
+}
+};
+
+/* ============================= Error class ================================ */
+
 class Error
 {
 public:
@@ -12,32 +40,99 @@ string getError()
 return "";
 }
 };
+
+/* ============================== Request class ============================= */
+
 class Request
 {
 };
+
+
+
+/* ============================== Response class ================================ */
+
+
 class Response
 {
+private:
+
+//introduced a property here
+
+string contentType;
+forward_list<string> content;
+forward_list<string>::iterator contentIterator;
+unsigned long contentLength;
+
 public:
+Response()
+{
+this->contentLength=0;
+this->contentIterator=this->content.before_begin();
+}
+~Response()
+{
+// not yet decided
+}
 void setContentType(string contentType)
 {
-//do nothing right now
+
+//introduced a method which was already available there just introduced the necessary code
+
+if(Validator::isValidMIMEType(contentType))
+{
+this->contentType=contentType;
+}
+
 }
 Response & operator<<(string content)
 {
-//right now do nothing
+this->contentLength+=content.length();
+this->contentIterator=this->content.insert_after(this->contentIterator,content);
+
+
 return *this;
 }
 };
+
+
+
+
+/* ================================ Merc class =============================== */
+
 class Merc
 {
+private:
+//introducing properties
+
+string staticResourcesFolder;
+map<string,void(*)(Request &, Response &)> urlMappings;
+
 public:
+Merc()
+{
+//not yet decided
+}
+~Merc()
+{
+//not yet decide
+}
 void setStaticResourcesFolder(string staticResourcesFolder)
 {
-//do nothing right now
-}
-void get(string urlPattern,void (*callBack)(Request &, Response &))
+if(Validator::isValidPath(staticResourcesFolder))
 {
-//do nothing right now
+this->staticResourcesFolder=staticResourcesFolder;
+}
+else
+{
+//not yet decided
+}
+}
+void get(string url ,void (*callBack)(Request &, Response &))
+{
+if(Validator::isValidURLFormat(url))
+{
+urlMappings.insert(pair< string, void (*) (Request &, Response &) >(url,callBack));
+}
 }
 void listen(int portNumber,void(*callBack)(Error &))
 {
@@ -49,13 +144,14 @@ void listen(int portNumber,void(*callBack)(Error &))
 
 
 
-
+/* =========================================== main class ============================== */
 
 
 int main()
 {
 Merc merc;
 merc.setStaticResourcesFolder("whatever");
+
 merc.get("/",[](Request &request, Response &response)-> void {
 const char *html=R""""(
 <!DOCTYPE HTML>
