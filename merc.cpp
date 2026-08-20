@@ -1,6 +1,9 @@
 #include<iostream>
 #include<map>
 #include<forward_list>
+#include<string.h>
+#include<windows.h>
+#include<unistd.h>
 using namespace std;
 
 /* ============================= Validator class ========================== */
@@ -30,14 +33,20 @@ return true;
 
 class Error
 {
+private:
+string error;
 public:
+Error(string error)
+{
+this->error=error;
+}
 bool hasError()
 {
-return false;
+return this->error.length()>0;
 }
 string getError()
 {
-return "";
+return this->error;
 }
 };
 
@@ -136,7 +145,79 @@ urlMappings.insert(pair< string, void (*) (Request &, Response &) >(url,callBack
 }
 void listen(int portNumber,void(*callBack)(Error &))
 {
-//do nothing right now
+WSADATA wsaData;
+WORD ver;
+ver=MAKEWORD(1,1);
+WSAStartup(ver,&wsaData);
+int serverSocketDescriptor;
+char requestBuffer[4096];
+int requestLength;
+int x;
+serverSocketDescriptor=socket(AF_INET, SOCK_STREAM,IPPROTO_TCP);
+if(serverSocketDescriptor<0)
+{
+WSACleanup();
+Error error("Unable to create Socket");
+callBack(error);
+return;
+}
+struct sockaddr_in serverSocketInformation;
+serverSocketInformation.sin_family=AF_INET;
+serverSocketInformation.sin_port=htons(portNumber);
+serverSocketInformation.sin_addr.s_addr=htonl(INADDR_ANY);
+int successCode=bind(serverSocketDescriptor,(struct sockaddr *)& serverSocketInformation, sizeof(serverSocketInformation));
+if(successCode<0)
+{
+closesocket(serverSocketDescriptor);
+WSACleanup();
+char a[101];
+sprintf(a,"Unable to bind socket to port:%d",portNumber);
+Error error(a);
+callBack(error);
+return;
+}
+successCode=::listen(serverSocketDescriptor,10);
+if(successCode<0)
+{
+closesocket(serverSocketDescriptor);
+WSACleanup();
+Error error("Unable to accept client connections");
+callBack(error);
+return;
+}
+Error error("");
+callBack(error);
+struct sockaddr_in clientSocketInformation;
+int len=sizeof(clientSocketInformation);
+int clientSocketDescriptor;
+while(1)
+{
+clientSocketDescriptor=accept(serverSocketDescriptor,(struct sockaddr *)& clientSocketInformation,&len);
+if(clientSocketDescriptor<0)
+{
+// not yet decided, will write this code later on
+}
+requestLength=recv(clientSocketDescriptor, requestBuffer,sizeof(requestBuffer),0);
+if(requestLength>0)
+{
+for(x=0;x<requestLength;x++) printf("%c",requestBuffer[x]);
+const char *response=
+"HTTP/1.1 200 OK\r\n"
+"Connection: close\r\n"
+"Content-Type: text/html\r\n"
+"Content-Length: 161\r\n\r\n"
+"<html><head><title>Smart Learning</title></head>"
+"<body><h1>Smart Learning approach...</h1>"
+"<h3>Makes Smarter people work smart and less hard.</h3></body></html>";
+send(clientSocketDescriptor,response,strlen(response),0);
+}
+// lot of code will be written here later on
+}//infinite loop ends
+
+
+
+
+
 }
 };
 
