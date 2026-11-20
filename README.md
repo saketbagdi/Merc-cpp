@@ -1,107 +1,105 @@
 # Merc
 
-**Merc** is a lightweight HTTP server framework being built from scratch in modern C++ to understand the internals of web servers, HTTP request processing, routing, socket programming, and multithreaded networking.
+A lightweight HTTP server framework written from scratch in C++ on raw TCP sockets, built to understand how web servers work internally: socket programming, request handling, routing and (next) concurrency.
 
-> **Project Status:** Under Active Development
+> **Status: early development.** The TCP server loop, request buffering and route registration work. Request parsing, sending HTTP responses and handler dispatch are the next milestones. See [Current status](#current-status) and the [Roadmap](#roadmap).
 
-## Features Implemented
+## Current status
 
-- Basic framework architecture
-- Request and Response abstractions
-- Error handling interface
-- Callback-based routing
-- URL routing infrastructure using `std::map`
-- Response buffering using `std::forward_list`
-- Content-Type support
-- Validator interface for URL, MIME type, and path validation
-- Static resource folder configuration
-- Sample HTML endpoints
+| Area | Status |
+|---|---|
+| TCP server: `socket()`, `bind()`, `listen()`, `accept()` | Implemented |
+| Receiving a request in chunks and assembling it into one buffer (`recv()`, `std::forward_list`) | Implemented |
+| Route registration with callbacks (`std::map` of URL to function pointer) | Implemented (`get()` only) |
+| `Response` object that buffers content and tracks content length | Implemented |
+| `Error` type and error callback for startup failures | Implemented |
+| Windows socket setup (Winsock) | Implemented |
+| `Validator` (URL, MIME type, path) | Interface only; checks currently accept everything |
+| Static resources folder | Setter only; files are not served yet |
+| `Request` class | Placeholder (empty) |
+| HTTP request parsing | Not yet |
+| Dispatching requests to registered handlers | Not yet |
+| Sending HTTP responses (status line, headers, body) | Not yet |
+| Linux build | Not yet (known issues listed in the roadmap) |
+| Multithreading / concurrent clients | Not yet (one connection at a time) |
+| Tests | Not yet |
 
-### Socket Programming
-
-- Cross-platform socket-related implementation using conditional compilation
-- TCP socket creation
-- Binding the server socket to a specified port
-- Listening for incoming client connections
-- Accepting client connections
-- Receiving client requests using `recv()`
-- Sending HTTP responses using `send()`
-- Basic socket error handling
-- Basic HTTP `200 OK` response
-- Client socket closure after request processing
-- Platform-specific socket API cleanup
-
-### Request Receiving and Buffering
-
-- Request data can be received in multiple chunks
-- Fixed-size request buffer with additional space reserved for null termination
-- `recv()` is instructed to receive one byte less than the total buffer size
-- Each received chunk is null-terminated before being stored
-- Received chunks are stored using `std::forward_list`
-- Number of received chunks is tracked
-- Total request data size is calculated
-- A dynamically allocated buffer is created for the complete request
-- All received chunks are combined into a single request buffer
-- Complete request data is null-terminated and ready for parsing
-- Dynamically allocated request data is released after processing
-
-## Current Server Flow
+## How it works today
 
 ```text
-Initialize Platform Socket API
-        ↓
-socket()
-        ↓
-bind()
-        ↓
-listen()
-        ↓
-accept()
-        ↓
-Receive Request Data
-        ↓
-Assemble Complete Request
-        ↓
-Request Parsing
-        ↓
-Generate Response
-        ↓
-send()
-        ↓
-Close Client Socket
-        ↓
-Cleanup Platform Socket API
+listen(port)
+    |
+    v
+socket() -> bind() -> listen() -> accept()   (loops forever)
+    |
+    v
+recv() chunks into std::forward_list<string>
+    |
+    v
+assemble chunks into one dynamically allocated buffer
+    |
+    v
+print raw request to the console
+    |
+    v
+[next] parse request -> match route -> call handler -> send response
+    |
+    v
+close client socket
+```
 
-## Current Request Receiving Flow
+At the moment the server receives and prints each raw request. It does not yet send a response back to the client.
 
-accept()
-    ↓
-recv() request chunk
-    ↓
-Add '\0' to the received chunk
-    ↓
-Store chunk in std::forward_list
-    ↓
-Receive next chunk
-    ↓
-Repeat until recv() returns 0
-    ↓
-Calculate total request size
-    ↓
-Allocate memory for complete request data
-    ↓
-Copy all chunks into the complete request buffer
-    ↓
-Add final '\0'
-    ↓
-Request ready for parsing
-    ↓
-Release request memory
-    ↓
-Close client socket
+## Usage
 
+This is how the framework is meant to be used (see `main()` in `merc.cpp`):
 
+```cpp
+Merc merc;
+merc.setStaticResourcesFolder("static");
 
+merc.get("/", [](Request &request, Response &response) -> void {
+    response.setContentType("text/html");
+    response << "<h1>Welcome</h1>";
+});
 
+merc.listen(6060, [](Error &error) -> void {
+    if (error.hasError()) { cout << error.getError(); return; }
+    cout << "Merc HTTP Server is ready to accept request at port 6060" << endl;
+});
+```
 
+Route registration and startup work today. Handlers are registered but not yet called, because request parsing and dispatch are not implemented.
 
+## Build and run
+
+**Windows (g++ / MinGW-w64):**
+
+```bat
+g++ -std=c++11 merc.cpp -o merc.exe -lws2_32
+merc.exe
+```
+
+The server listens on port `6060`. Open `http://localhost:6060/` in a browser and watch the console to see the raw request the server receives.
+
+**Linux:** does not build yet. See the roadmap.
+
+## Roadmap
+
+In priority order:
+
+- [ ] Send a valid HTTP response (status line, `Content-Type`, `Content-Length`, body)
+- [ ] Parse the request line and headers and populate `Request`
+- [ ] Dispatch requests to registered handlers; return 404 for unknown routes
+- [ ] Read until the end of the headers (`\r\n\r\n`) instead of waiting for the client to close the connection, and handle `recv()` errors
+- [ ] Fix the Linux build (`<arpa/inet.h>` include, `closesocket`/`close` per platform, `__linux__` macro, link flags)
+- [ ] Serve static files from the static resources folder with correct MIME types
+- [ ] Implement the `Validator` checks
+- [ ] Handle multiple clients (thread per connection, then a thread pool)
+- [ ] Support `POST`, query strings and more status codes
+- [ ] Split `merc.cpp` into headers and sources; add a `Makefile` or `CMakeLists.txt`
+- [ ] Add tests
+
+## Author
+
+**Saket Bagdi**: [GitHub](https://github.com/saketbagdi) · saket.bagdi@gmail.com
